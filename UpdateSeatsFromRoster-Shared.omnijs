@@ -1,0 +1,342 @@
+/*{
+    "type": "action",
+    "targets": ["omnigraffle"],
+    "author": "Claude",
+    "identifier": "org.community.seatingchart.roster.shared",
+    "version": "1.5",
+    "description": "Updates a color-coded seating chart from pasted roster, auto-creates missing seats",
+    "label": "Update Seats from Roster - Shared",
+    "shortLabel": "Update from Roster"
+}*/
+(() => {
+    const action = new PlugIn.Action(async function(selection) {
+        try {
+            const canvas = document.windows[0].selection.canvas;
+            
+            const SECTION_COLORS = {
+                'Flute':               { r: 0.80, g: 0.80, b: 0.80 },
+                'Oboe':                { r: 0.00, g: 1.00, b: 1.00 },
+                'Clarinet':            { r: 0.60, g: 0.60, b: 0.60 },
+                'Bass Clarinet':       { r: 0.40, g: 0.40, b: 0.40 },
+                'Bassoon':             { r: 0.50, g: 0.56, b: 0.73 },
+                'Alto Sax':            { r: 0.96, g: 0.74, b: 0.00 },
+                'Alto Saxophone':      { r: 0.96, g: 0.74, b: 0.00 },
+                'Tenor Sax':           { r: 0.87, g: 0.68, b: 0.15 },
+                'Tenor Saxophone':     { r: 0.87, g: 0.68, b: 0.15 },
+                'Bari Sax':            { r: 1.00, g: 0.00, b: 0.00 },
+                'Baritone Sax':        { r: 1.00, g: 0.00, b: 0.00 },
+                'Baritone Saxophone':  { r: 1.00, g: 0.00, b: 0.00 },
+                'Trumpet':             { r: 0.84, g: 0.68, b: 0.64 },
+                'Horn':                { r: 1.00, g: 0.75, b: 0.75 },
+                'Trombone':            { r: 1.00, g: 0.47, b: 0.00 },
+                'Euphonium':           { r: 1.00, g: 1.00, b: 0.25 },
+                'Tuba':                { r: 0.41, g: 0.74, b: 0.21 },
+                'Percussion':          { r: 1.00, g: 1.00, b: 1.00 },
+            };
+            
+            const COLOR_THRESHOLD = 0.25;
+            const ROW_TOLERANCE = 30;
+            const PERCUSSION_Y_THRESHOLD = 130;
+            
+            function colorDistance(c1, c2) {
+                return Math.sqrt(
+                    Math.pow(c1.r - c2.r, 2) +
+                    Math.pow(c1.g - c2.g, 2) +
+                    Math.pow(c1.b - c2.b, 2)
+                );
+            }
+            
+            function identifySection(color, y, isPercussionCandidate) {
+                if (isPercussionCandidate && y < PERCUSSION_Y_THRESHOLD) {
+                    return 'Percussion';
+                }
+                
+                let bestMatch = null;
+                let bestDist = Infinity;
+                
+                for (const [section, targetColor] of Object.entries(SECTION_COLORS)) {
+                    if (section === 'Percussion') continue;
+                    const dist = colorDistance(color, targetColor);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestMatch = section;
+                    }
+                }
+                
+                return bestDist < COLOR_THRESHOLD ? bestMatch : null;
+            }
+            
+            function normalizeSection(name) {
+                const n = name.trim().toLowerCase();
+                if (n.includes('alto') && n.includes('sax')) return 'Alto Sax';
+                if (n.includes('tenor') && n.includes('sax')) return 'Tenor Sax';
+                if (n.includes('bari') && n.includes('sax')) return 'Bari Sax';
+                if (n.includes('bass') && n.includes('clar')) return 'Bass Clarinet';
+                return name.trim().split(' ').map(w => 
+                    w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+                ).join(' ');
+            }
+            
+            function parseRoster(text) {
+                const sections = {};
+                let currentSection = null;
+                
+                for (let line of text.split('\n')) {
+                    line = line.trim();
+                    if (!line) continue;
+                    
+                    const lowerLine = line.toLowerCase();
+                    const isHeader = (
+                        !line.includes(',') &&
+                        (lowerLine.includes('flute') ||
+                         lowerLine.includes('oboe') ||
+                         lowerLine.includes('clarinet') ||
+                         lowerLine.includes('bassoon') ||
+                         lowerLine.includes('saxophone') ||
+                         lowerLine.includes('trumpet') ||
+                         lowerLine.includes('horn') ||
+                         lowerLine.includes('trombone') ||
+                         lowerLine.includes('euphonium') ||
+                         lowerLine.includes('tuba') ||
+                         lowerLine.includes('percussion'))
+                    );
+                    
+                    if (isHeader) {
+                        currentSection = normalizeSection(line);
+                        if (!sections[currentSection]) sections[currentSection] = [];
+                    } else if (currentSection && line.includes(',')) {
+                        const parts = line.split(',');
+                        const lastName = parts[0].trim();
+                        const firstName = parts.slice(1).join(',').trim().split(' ')[0];
+                        sections[currentSection].push(firstName + ' ' + lastName);
+                    }
+                }
+                return sections;
+            }
+            
+            function isStudentShape(text) {
+                if (!text || text.length < 3) return false;
+                if (/^\d+$/.test(text)) return false;
+                if (/^\d+\s*\/\s*\d+$/.test(text)) return false;
+                if (/^folders?\s/i.test(text)) return false;
+                if (/^percussion\s*\d/i.test(text)) return false;
+                if (/^mallets?$/i.test(text)) return false;
+                if (/^timpani$/i.test(text)) return false;
+                return true;
+            }
+            
+            // ============================================================
+            // Get roster
+            // ============================================================
+            const form = new Form();
+            form.addField(new Form.Field.String('roster', 'Paste Roster', Pasteboard.general.string || ''));
+            
+            const result = await form.show('Update Seats from Roster', 'Update');
+            if (!result) return;
+            
+            const sections = parseRoster(result.values.roster);
+            let totalStudents = Object.values(sections).reduce((sum, arr) => sum + arr.length, 0);
+            
+            if (totalStudents === 0) {
+                new Alert('No Students Found', 'Could not parse any students.').show();
+                return;
+            }
+            
+            // ============================================================
+            // Scan seats
+            // ============================================================
+            const sectionSeats = {};
+            const sectionTemplates = {};
+            
+            for (const graphic of canvas.graphics) {
+                if (!(graphic instanceof Shape)) continue;
+                
+                const text = graphic.text ? graphic.text.replace(/\n/g, ' ').trim() : '';
+                if (!isStudentShape(text)) continue;
+                
+                const bounds = graphic.geometry;
+                if (!bounds) continue;
+                
+                const x = bounds.origin.x + bounds.size.width / 2;
+                const y = bounds.origin.y + bounds.size.height / 2;
+                
+                let color = { r: 1, g: 1, b: 1 };
+                let isPercussionCandidate = false;
+                
+                try {
+                    if (graphic.fillColor) {
+                        const fc = graphic.fillColor;
+                        color = {
+                            r: fc.red !== undefined ? fc.red : 1,
+                            g: fc.green !== undefined ? fc.green : 1,
+                            b: fc.blue !== undefined ? fc.blue : 1
+                        };
+                        
+                        const isWhiteish = (color.r > 0.9 && color.g > 0.9 && color.b > 0.9);
+                        const isBlackish = (color.r < 0.1 && color.g < 0.1 && color.b < 0.1);
+                        
+                        if ((isWhiteish || isBlackish) && y < PERCUSSION_Y_THRESHOLD) {
+                            isPercussionCandidate = true;
+                        }
+                    } else if (y < PERCUSSION_Y_THRESHOLD) {
+                        isPercussionCandidate = true;
+                    }
+                } catch (e) {
+                    if (y < PERCUSSION_Y_THRESHOLD) isPercussionCandidate = true;
+                }
+                
+                const section = identifySection(color, y, isPercussionCandidate);
+                if (!section) continue;
+                
+                const normSection = normalizeSection(section);
+                
+                if (!sectionSeats[normSection]) {
+                    sectionSeats[normSection] = [];
+                    sectionTemplates[normSection] = graphic;
+                }
+                sectionSeats[normSection].push({ 
+                    shape: graphic, 
+                    x, y,
+                    width: bounds.size.width,
+                    height: bounds.size.height
+                });
+            }
+            
+            // ============================================================
+            // Sort seats
+            // ============================================================
+            for (const section of Object.keys(sectionSeats)) {
+                const seats = sectionSeats[section];
+                
+                if (section === 'Percussion') {
+                    seats.sort((a, b) => {
+                        if (Math.abs(a.y - b.y) < ROW_TOLERANCE) return a.x - b.x;
+                        return a.y - b.y;
+                    });
+                } else {
+                    seats.sort((a, b) => b.y - a.y);
+                    
+                    const rows = [];
+                    let currentRow = [];
+                    
+                    for (const seat of seats) {
+                        if (currentRow.length === 0 || Math.abs(seat.y - currentRow[0].y) < ROW_TOLERANCE) {
+                            currentRow.push(seat);
+                        } else {
+                            rows.push(currentRow);
+                            currentRow = [seat];
+                        }
+                    }
+                    if (currentRow.length > 0) rows.push(currentRow);
+                    
+                    const sorted = [];
+                    for (const row of rows) {
+                        row.sort((a, b) => b.x - a.x);
+                        sorted.push(...row);
+                    }
+                    sectionSeats[section] = sorted;
+                }
+            }
+            
+            // ============================================================
+            // Apply assignments + create new seats using canvas.duplicate()
+            // ============================================================
+            let updateCount = 0;
+            let createCount = 0;
+            let extraSeats = [];
+            
+            for (const [section, students] of Object.entries(sections)) {
+                let seats = sectionSeats[section] || [];
+                const template = sectionTemplates[section];
+                
+                // Create new seats by duplicating template via canvas
+                let offsetIndex = 0;
+                while (seats.length < students.length) {
+                    if (!template) break;
+                    
+                    // Use canvas.duplicate() to duplicate the shape
+                    const duplicates = canvas.duplicate([template]);
+                    if (!duplicates || duplicates.length === 0) break;
+                    
+                    const newShape = duplicates[0];
+                    
+                    // Calculate new position
+                    const lastSeat = seats[seats.length - 1];
+                    const templateBounds = template.geometry;
+                    
+                    let newX, newY;
+                    offsetIndex++;
+                    
+                    if (section === 'Percussion') {
+                        newX = lastSeat.x + templateBounds.size.width + 15;
+                        newY = lastSeat.y;
+                    } else {
+                        newX = lastSeat.x - (40 * offsetIndex);
+                        newY = lastSeat.y - (35 * offsetIndex);
+                    }
+                    
+                    // Move the duplicated shape
+                    newShape.geometry = new Rect(
+                        newX - templateBounds.size.width / 2,
+                        newY - templateBounds.size.height / 2,
+                        templateBounds.size.width,
+                        templateBounds.size.height
+                    );
+                    
+                    seats.push({ 
+                        shape: newShape, 
+                        x: newX, 
+                        y: newY,
+                        width: templateBounds.size.width,
+                        height: templateBounds.size.height
+                    });
+                    createCount++;
+                }
+                
+                // Track extra seats
+                if (seats.length > students.length) {
+                    extraSeats.push(`${section}: ${seats.length - students.length} extra`);
+                }
+                
+                // Assign students to seats
+                for (let i = 0; i < students.length && i < seats.length; i++) {
+                    const student = students[i];
+                    const seat = seats[i];
+                    
+                    const parts = student.split(' ');
+                    const displayName = parts.length === 1 
+                        ? parts[0]
+                        : parts[0] + '\n' + parts.slice(1).join(' ');
+                    
+                    seat.shape.text = displayName;
+                    updateCount++;
+                }
+            }
+            
+            // ============================================================
+            // Report
+            // ============================================================
+            let message = `Updated ${updateCount} seats.`;
+            
+            if (createCount > 0) {
+                message += `\nCreated ${createCount} new seats (reposition as needed).`;
+            }
+            
+            if (extraSeats.length > 0) {
+                message += `\n\nExtra seats (delete manually if needed):\n• ${extraSeats.join('\n• ')}`;
+            }
+            
+            new Alert('Update Complete', message).show();
+            
+        } catch (error) {
+            console.error(error);
+            new Alert('Error', String(error)).show();
+        }
+    });
+    
+    action.validate = function(selection) {
+        return document !== null;
+    };
+    
+    return action;
+})();
