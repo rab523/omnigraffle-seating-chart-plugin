@@ -1,6 +1,6 @@
-# Update Seats from Roster for OmniGraffle
+# Seating Chart Generator for OmniGraffle
 
-Paste an instrument roster to update names in an existing color-coded seating chart. The plug-in can duplicate existing seats when a section needs more places.
+Paste a roster of students to populate a concert-band seating chart in OmniGraffle. The plug-in uses an existing color-coded layout and can duplicate existing seats when a section needs more places.
 
 **This is a layout-specific tool, not a blank-canvas chart generator.** Start with a copy of a chart containing colored seat shapes, with at least one template seat for each instrument section. No real student list or school seating chart is included.
 
@@ -8,7 +8,7 @@ Paste an instrument roster to update names in an existing color-coded seating ch
 
 1. Download [UpdateSeatsFromRoster-Shared.omnijs](UpdateSeatsFromRoster-Shared.omnijs?raw=true) and open it with OmniGraffle. Follow the plug-in installation prompt; your edition must support Omni Automation.
 2. Make a working copy of your chart and select its canvas.
-3. Copy a roster formatted like [sample-roster.txt](sample-roster.txt), then choose **Update Seats from Roster - Shared** in the Automation menu.
+3. Copy a roster formatted like [sample-roster.txt](sample-roster.txt), then choose **Seating Chart Generator - Shared** in the Automation menu.
 4. Review the pasted roster and choose **Update**. Inspect the resulting positions and the completion report before sharing the chart.
 
 Use section headings such as `Flute`, `Bass Clarinet`, `Alto Saxophone`, `Trumpet`, or `Percussion`, followed by one `Last, First` entry per line. Only the first word of the given name is used. Use `Saxophone` in saxophone headings.

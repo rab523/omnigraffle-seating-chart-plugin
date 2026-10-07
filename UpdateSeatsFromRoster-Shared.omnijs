@@ -3,10 +3,10 @@
     "targets": ["omnigraffle"],
     "author": "Claude",
     "identifier": "org.community.seatingchart.roster.shared",
-    "version": "1.5",
+    "version": "1.5.1",
     "description": "Updates a color-coded seating chart from pasted roster, auto-creates missing seats",
-    "label": "Update Seats from Roster - Shared",
-    "shortLabel": "Update from Roster"
+    "label": "Seating Chart Generator - Shared",
+    "shortLabel": "Seating Chart Generator"
 }*/
 (() => {
     const action = new PlugIn.Action(async function(selection) {
