@@ -2,11 +2,11 @@
 
 Paste a roster of students to populate a concert-band seating chart in OmniGraffle. The plug-in uses an existing color-coded layout and can duplicate existing seats when a section needs more places.
 
-**This is a layout-specific tool, not a blank-canvas chart generator.** Start with a copy of a chart containing colored seat shapes, with at least one template seat for each instrument section. No real student list or school seating chart is included.
+**This is a layout-specific tool, not a blank-canvas chart generator.** Start with a copy of a chart containing colored seat shapes, with at least one template seat for each instrument section.
 
 ## Install and use
 
-1. Download [UpdateSeatsFromRoster-Shared.omnijs](UpdateSeatsFromRoster-Shared.omnijs?raw=true) and open it with OmniGraffle. Follow the plug-in installation prompt; your edition must support Omni Automation.
+1. Download [UpdateSeatsFromRoster-Shared.omnijs](UpdateSeatsFromRoster-Shared.omnijs?raw=true) and open it with OmniGraffle. Follow the plug-in installation prompt; your version must support Omni Automation.
 2. Make a working copy of your chart and select its canvas.
 3. Copy a roster formatted like [sample-roster.txt](sample-roster.txt), then choose **Seating Chart Generator - Shared** in the Automation menu.
 4. Review the pasted roster and choose **Update**. Inspect the resulting positions and the completion report before sharing the chart.
@@ -37,9 +37,3 @@ Seat text must contain at least three characters. Numeric labels and certain equ
 White, black, or unfilled percussion candidates must be near the top of the canvas (y below 130). Instrument rows use a 30-point tolerance. Most sections fill rows from bottom to top, right to left; percussion uses top to bottom, left to right. These assumptions may require adapting the code to your chart.
 
 Surplus seats are reported, not automatically erased; old names may remain in unused seats. Review and remove those locally. A section without a matching seat template cannot be generated automatically.
-
-## Privacy and validation
-
-The plug-in reads the clipboard to prefill its roster form and edits the current document locally. It has no network upload functionality. Keep real rosters and completed charts out of this public repository. The sample uses fictional names.
-
-The shared copy has a separate identifier to preserve an installed personal copy. JavaScript syntax and roster parsing were checked; a fresh OmniGraffle layout test of this shared copy remains pending.
